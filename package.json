@@ -1,0 +1,37 @@
+{
+  "name": "win-win-be",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/server.js",
+  "keywords": [
+    "upwork",
+    "scraper",
+    "nodejs",
+    "express",
+    "mongodb",
+    "puppeteer"
+  ],
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "seed:account": "node scripts/seedUpworkAccount.js"
+  },
+  "author": "Shaheryar Rafique",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "express-validator": "^7.2.1",
+    "mongoose": "^8.15.1",
+    "morgan": "^1.10.0",
+    "node-cron": "^4.0.7",
+    "puppeteer": "^24.9.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "user-agents": "^1.1.554"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
