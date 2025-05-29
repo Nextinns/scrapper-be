@@ -24,7 +24,9 @@ const getOrCreateBrowserInstance = async (accountEmail, cookies) => {
   // Create a new browser instance
   console.log(`Creating new browser instance for ${accountEmail}...`);
   const isHeadless = process.env.PUPPETEER_HEADLESS === false; 
+  console.log(`Headless mode is set to: ${isHeadless}`);
   const { browser, page } = await puppeteerUtils.launchBrowser({ isHeadless });
+  console.log(`Launched new browser for ${accountEmail}`);
 
   await page.goto('https://www.upwork.com/nx/find-work', { waitUntil: 'networkidle0', timeout: 0 });
   console.log(`Mapped to Upwork before setting cookies for ${accountEmail}`);
