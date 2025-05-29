@@ -14,6 +14,7 @@ const getOrCreateBrowserInstance = async (accountEmail, cookies) => {
       console.log(`Reusing existing browser instance for ${accountEmail}`);
 
       await refreshCookies(page, cookies);
+      await page.goto('https://www.upwork.com/nx/find-work', { waitUntil: 'networkidle0', timeout: 0 });
       return instance;
     }
 
@@ -28,17 +29,20 @@ const getOrCreateBrowserInstance = async (accountEmail, cookies) => {
   const { browser, page } = await puppeteerUtils.launchBrowser({ isHeadless });
   console.log(`Launched new browser for ${accountEmail}`);
 
-  await page.goto('https://www.upwork.com/nx/find-work', { waitUntil: 'networkidle0', timeout: 0 });
-  console.log(`Mapped to Upwork before setting cookies for ${accountEmail}`);
 
   if (cookies && cookies.length > 0) {
-    console.log(`Setting cookies for ${accountEmail}:`, cookies); // Log cookies before setting
+    console.log(`Setting cookies for ${accountEmail}:`, cookies); 
+
+    await page.goto('https://www.upwork.com/nx/find-work', { waitUntil: 'networkidle0', timeout: 0 });
     await page.setCookie(...cookies);
     console.log(`Set initial cookies for new page for ${accountEmail}`);
   } else {
     console.log(`No cookies provided for ${accountEmail}`);
   }
 
+  await page.goto('https://www.upwork.com/nx/find-work', { waitUntil: 'networkidle0', timeout: 0 });
+  console.log(`Navigated to Upwork find-work page for ${accountEmail}`);
+  
   activeBrowserInstances.set(accountEmail, { browser, page });
   return { browser, page };
 };
@@ -65,10 +69,9 @@ const refreshPageSession = async (page, newCookies) => {
     throw new Error('Page is closed or invalid, cannot refresh session.');
   }
 
-  await page.goto('about:blank', { waitUntil: 'domcontentloaded' });
+  await page.goto('https://www.upwork.com/nx/find-work', { waitUntil: 'networkidle2', timeout: 60000 });
   await refreshCookies(page, newCookies);
 
-  await page.goto('https://www.upwork.com/nx/find-work', { waitUntil: 'networkidle2', timeout: 60000 });
   console.log('Page session refreshed.');
   return page;
 };
