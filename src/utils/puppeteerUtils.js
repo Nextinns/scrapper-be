@@ -1,22 +1,13 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const userAgent = require('user-agents');
-
-// Enable Stealth Plugin to avoid bot detection
+const randomUseragent = require("random-useragent");
 puppeteer.use(StealthPlugin());
 
 const launchBrowser = async ({ isHeadless = false, proxyServer = null } = {}) => {
   const args = [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage',
-    '--disable-accelerated-2d-canvas',
-    '--no-first-run',
-    '--no-zygote',
-    '--disable-gpu',
-    '--ignore-certificate-errors',
-    '--incognito', 
-    '--disable-web-security', 
+    "--no-sandbox",
+    // "--headless=new",
+    "--disable-setuid-sandbox"
   ];
 
   if (proxyServer) {
@@ -31,13 +22,17 @@ const launchBrowser = async ({ isHeadless = false, proxyServer = null } = {}) =>
       executablePath: puppeteer.executablePath(),
       headless: headlessMode,
       devtools: false,
-      defaultViewport: null,
+      defaultViewport: {
+        width: 1440,
+        height: 1080,
+    },      
       ignoreHTTPSErrors: true,
       args: args,
       protocolTimeout: 2400000
     });
 
     const page = await browser.newPage();
+    // await page.setUserAgent(randomUseragent.getRandom());
     await setupPage(page);
 
     return { browser, page };
@@ -48,9 +43,8 @@ const launchBrowser = async ({ isHeadless = false, proxyServer = null } = {}) =>
 };
 
 const setupPage = async (page) => {
-  // Rotate User-Agent for each session
-  const randomUserAgent = new userAgent();
-  await page.setUserAgent(randomUserAgent.toString());
+
+  await page.setUserAgent(randomUseragent.getRandom());
 
   // Avoid Cloudflare and other bot checks
   await page.evaluateOnNewDocument(() => {

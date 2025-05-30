@@ -1,13 +1,17 @@
 const puppeteerScraperManager = require('./puppeteerScraperManager');
 const { AuthError, PuppeteerError, JobArchivedError } = require('../utils/errors');
 
+
 const fetchAndSaveJobDetails = async (jobPosting, upworkAccount) => {
     console.log(`Starting to process job: ${jobPosting.upworkJobId} using account ${upworkAccount.email}`);
     jobPosting.status = 'PROCESSING';
     jobPosting.errorMessage = null; // Clear previous errors
     await jobPosting.save();
 
+    console.log('Cookie Length:', upworkAccount.cookies.length);
+
     let page; // Keep page in broader scope for potential error handling access
+    let browser;
 
     try {
         const instance = await puppeteerScraperManager.getOrCreateBrowserInstance(
@@ -15,6 +19,9 @@ const fetchAndSaveJobDetails = async (jobPosting, upworkAccount) => {
             upworkAccount.cookies,
         );
         page = instance.page; // Assign to broader scope
+        browser = instance.browser; // Keep browser reference for potential closing
+
+        // page.setCookie(...upworkAccount.cookies); 
 
         // Helper to find specific cookie needed for GraphQL
         const findGqlToken = (cookiesArray) => {
@@ -25,16 +32,8 @@ const fetchAndSaveJobDetails = async (jobPosting, upworkAccount) => {
 
         const gqlTokenValue = findGqlToken(jobPosting.cookies);
 
-        const upworkLink = jobPosting.link;
-        const linkMatch = upworkLink.match(/~(\w+)(\/apply)?\/?$/);
-        const upworkInternalJobId = linkMatch ? linkMatch[1] : null;
-
-        if (!upworkInternalJobId) {
-            throw new Error(`Could not extract Upwork internal job ID from link: ${upworkLink}`);
-        }
-
         const extractedData = await page.evaluate(
-            async (passedJobId, token, internalJobId, gqlTokenValue) => {
+            async (passedJobId, token, gqlTokenValue) => {
                 // This function runs in the browser context
                 let result = {
                     clientDetails: {},
@@ -42,7 +41,7 @@ const fetchAndSaveJobDetails = async (jobPosting, upworkAccount) => {
                     errorsInEvaluate: []
                 };
 
-                console.log(`Starting data extraction for job ID: ${passedJobId}, internal ID: ${internalJobId}`);
+                console.log(`Starting data extraction for job ID: ${passedJobId}`);
 
                 const internalFetchData = async (url, authToken, method = 'GET', body = null) => {
                     try {
@@ -95,10 +94,49 @@ const fetchAndSaveJobDetails = async (jobPosting, upworkAccount) => {
                     }
                 };
 
+                const internalFetchGQLData = async (url, authToken, method, body) => {
+                    try {
+                        const headers = {
+                            accept: "application/json",
+                            "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
+                            authorization: `Bearer ${authToken}`,
+                            "content-type": "application/json",
+                        };
+
+                        const response = await fetch(url, {
+                            method: method,
+                            headers: headers,
+                            referrer: `https://www.upwork.com/ab/proposals/job/~${passedJobId}/apply/`,
+                            referrerPolicy: "origin-when-cross-origin",
+                            body: JSON.stringify(body),
+                            mode: 'cors',
+                            credentials: 'include', // Important for Upwork APIs
+                        });
+
+                        if (response.ok) {
+                            return await response.json();
+                        } else {
+                            // Throw a structured error to be caught and parsed
+                            throw new Error(JSON.stringify({
+                                code: response.status,
+                                message: `API call to ${url} failed with status ${response.status}: ${await response.text()}`,
+                            }));
+                        }
+                    } catch (error) {
+                        // Log error within evaluate for browser console, then re-throw
+                        console.error(`internalFetchData error for URL ${url}:`, error.message);
+                        throw error; // Re-throw: will be caught by the page.evaluate's outer try-catch
+                    }
+                };
+
+
                 try {
                     // Fetch job opening details
                     const jobDetailsUrl = `https://www.upwork.com/ab/proposals/api/openings/${passedJobId}`;
                     const jobOpeningData = await internalFetchData(jobDetailsUrl, token);
+
+                    console.log(`Fetched job opening data for job ID: ${passedJobId}`, jobOpeningData);
+
                     result.jobDetailsData.openingApiData = jobOpeningData;
 
                     if (!jobOpeningData || !jobOpeningData.opening) {
@@ -109,9 +147,9 @@ const fetchAndSaveJobDetails = async (jobPosting, upworkAccount) => {
                     result.clientDetails.organizationId = jobOpeningData.opening.organizationUid;
 
                     // Fetch person (client) details using GraphQL
-                    const personDetailsResponse = await internalFetchData(
+                    const personDetailsResponse = await internalFetchGQLData(
                         "https://www.upwork.com/api/graphql/v1",
-                        token,
+                        gqlTokenValue,
                         "POST",
                         {
                             query: `
@@ -183,7 +221,6 @@ const fetchAndSaveJobDetails = async (jobPosting, upworkAccount) => {
             },
             jobPosting.upworkJobId,
             upworkAccount.upworkAuthToken,
-            upworkInternalJobId,
             gqlTokenValue
         );
 

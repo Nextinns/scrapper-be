@@ -1,10 +1,38 @@
 // src/services/puppeteerScraperManager.js
-const puppeteerUtils = require('../utils/puppeteerUtils'); // This will now refer to your enhanced utils
+// const puppeteerUtils = require('../utils/puppeteerUtils'); // This will now refer to your enhanced utils
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const randomUseragent = require("random-useragent");
+puppeteer.use(StealthPlugin());
+
 
 const activeBrowserInstances = new Map(); // Key: accountEmail, Value: { browser, page }
 
 const getOrCreateBrowserInstance = async (accountEmail, cookies) => {
+
   const instance = activeBrowserInstances.get(accountEmail);
+
+  const args = [
+    "--no-sandbox",
+    // "--headless=new",
+    "--disable-setuid-sandbox"
+  ];
+
+  const browser = await puppeteer.launch({
+    executablePath: puppeteer.executablePath(),
+    headless: true,
+    devtools: false,
+    defaultViewport: {
+      width: 1440,
+      height: 1080,
+    },
+    ignoreHTTPSErrors: true,
+    args: args,
+    protocolTimeout: 2400000
+  });
+
+  const page = await browser.newPage();
+  await page.setUserAgent(randomUseragent.getRandom());
 
   if (instance) {
     const { browser, page } = instance;
@@ -14,7 +42,7 @@ const getOrCreateBrowserInstance = async (accountEmail, cookies) => {
       console.log(`Reusing existing browser instance for ${accountEmail}`);
 
       await refreshCookies(page, cookies);
-      await page.goto('https://www.upwork.com/nx/find-work', { waitUntil: 'networkidle0', timeout: 0 });
+      await page.goto('https://www.upwork.com/nx/find-work', { timeout: 0, waitUntil: ["networkidle0", "domcontentloaded"] });
       return instance;
     }
 
@@ -24,27 +52,28 @@ const getOrCreateBrowserInstance = async (accountEmail, cookies) => {
 
   // Create a new browser instance
   console.log(`Creating new browser instance for ${accountEmail}...`);
-  const isHeadless = process.env.PUPPETEER_HEADLESS === false; 
-  console.log(`Headless mode is set to: ${isHeadless}`);
-  const { browser, page } = await puppeteerUtils.launchBrowser({ isHeadless });
+
+  // const { browser, page } = await puppeteerUtils.launchBrowser({ isHeadless });
   console.log(`Launched new browser for ${accountEmail}`);
 
 
   if (cookies && cookies.length > 0) {
-    console.log(`Setting cookies for ${accountEmail}:`, cookies); 
+    console.log(`Setting cookies for ${accountEmail}:`, cookies);
 
-    await page.goto('https://www.upwork.com/nx/find-work', { waitUntil: 'networkidle0', timeout: 0 });
+    await page.goto('https://www.upwork.com/nx/find-work', { timeout: 0, waitUntil: ["domcontentloaded"] });
     await page.setCookie(...cookies);
     console.log(`Set initial cookies for new page for ${accountEmail}`);
   } else {
     console.log(`No cookies provided for ${accountEmail}`);
   }
 
-  await page.goto('https://www.upwork.com/nx/find-work', { waitUntil: 'networkidle0', timeout: 0 });
+  console.log(`Navigating to Upwork find-work page for ${accountEmail}...`);
+
+  await page.goto('https://www.upwork.com/nx/find-work', { timeout: 0, waitUntil: ["networkidle0", "domcontentloaded"] });
   console.log(`Navigated to Upwork find-work page for ${accountEmail}`);
-  
+
   activeBrowserInstances.set(accountEmail, { browser, page });
-  return { browser, page };
+  return { browser, page, jobId: "" };
 };
 
 const refreshCookies = async (page, newCookies) => {
@@ -69,8 +98,10 @@ const refreshPageSession = async (page, newCookies) => {
     throw new Error('Page is closed or invalid, cannot refresh session.');
   }
 
-  await page.goto('https://www.upwork.com/nx/find-work', { waitUntil: 'networkidle2', timeout: 60000 });
+  await page.goto('https://www.upwork.com/nx/find-work', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await refreshCookies(page, newCookies);
+
+  await page.goto('https://www.upwork.com/nx/find-work', { waitUntil: 'domcontentloaded', timeout: 60000 });
 
   console.log('Page session refreshed.');
   return page;

@@ -20,7 +20,7 @@ const runJobProcessing = async () => {
     dbConnected = true;
     console.log('Starting job processing script...');
 
-    const jobsToProcess = await JobPosting.find({ status: 'NOT_PROCESSED' })
+    const jobsToProcess = await JobPosting.find({ status: ['NOT_PROCESSED', 'FAILED_PROCESSING'] })
       .sort({ createdAt: 1 }) // Prioritize older jobs
       .limit(JOB_PROCESSING_BATCH_SIZE);
 

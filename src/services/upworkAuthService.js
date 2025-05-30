@@ -19,12 +19,7 @@ const loginAccount = async (email, password, securityAnswer) => {
       timeout: 0, // 60 seconds timeout
       waitUntil: "domcontentloaded",
     });
-    await sleep(3000); // Wait for page to settle
 
-    await page.goto("https://www.upwork.com/ab/account-security/login", {
-      timeout: 0,
-      waitUntil: "domcontentloaded",
-    });
     await sleep(3000);
     await page.waitForSelector('input[type="text"]');
     await page.type('input[type="text"]', email, { delay: 20 });
@@ -66,7 +61,7 @@ const loginAccount = async (email, password, securityAnswer) => {
 
     if (!authTokenCookie) {
       console.warn(`Auth token not found initially for ${email}. Reloading page...`);
-      await page.reload({ waitUntil: ["networkidle0", "domcontentloaded"], timeout: 60000 });
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
       await sleep(15000); // Wait significantly after reload
       cookies = await page.cookies(); // Re-fetch cookies
       authTokenCookie =
